@@ -54,4 +54,3 @@ Or use the `BibTeX` version below:
   - Proportion of sample that must have a statistically significant effect for a path to be added to the "group"-level.
   - Classic GIMME uses 75% threshold; testing for continuous-time suggests that this can be lower for CT-VAR
 
-Several elements
