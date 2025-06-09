@@ -33,6 +33,7 @@ source("https://raw.githubusercontent.com/JPark93/ctgimme/refs/heads/main/ctsgim
   # All other successive tests use a more stringent p-value
 # Ialpha = p-value for individual-level effects
 # sig.thrsh - Proportion of sample that must have a statistically significant effect for a path to be added to the "group"-level
+  # Classic GIMME uses 75% threshold; testing for continuous-time suggests that this can be lower for CT-VAR
 
 example = ctsgimme(varnames = paste0("y", 1:5), 
                    dataframe = dataset,
@@ -41,7 +42,7 @@ example = ctsgimme(varnames = paste0("y", 1:5),
                    ME.var = diag(1e-5, 5), 
                    PE.var = diag(1.00, 5),
                    cores = 25, 
-                   directory = "C:/Users/imjpark/Desktop/ForMike/",
+                   directory = "./ExampleResults/",
                    ben.hoch = TRUE, 
                    Galpha = 0.05, 
                    Ialpha = 0.05,
@@ -49,7 +50,7 @@ example = ctsgimme(varnames = paste0("y", 1:5),
 
 # Compare to True Values
 par(mfrow = c(1,1))
-qgraph(das[[3]], diag = TRUE,
+qgraph(Trues[[3]], diag = TRUE,
        theme = "colorblind",
        layout = "circle",
-       edge.labels = das[[3]])
+       edge.labels = round(Trues[[3]], 2))
