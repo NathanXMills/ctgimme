@@ -7,7 +7,7 @@ Trues = readRDS("./TDrifts.RDS")
 dataset = data.frame(readRDS("./Dataset.RDS"))
 head(dataset)
 dataset$id = dataset$ID
-source("https://raw.githubusercontent.com/JPark93/ctgimme/refs/heads/main/ctsgimme-ver-0.0.3.R?token=GHSAT0AAAAAADFB4XWEIMVBU7GRD2VOBB4Q2CGK5DQ")
+source("https://raw.githubusercontent.com/JPark93/ctgimme/refs/heads/main/ctsgimme-ver-0.0.3.R")
 # varnames = vector of variable names in dataset used for analysis
 # dataframe = the dataset as a data.frame object or as a matrix
 # id = Character string denoting the ID variable; ideally, set to "ID"
