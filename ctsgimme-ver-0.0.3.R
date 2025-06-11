@@ -259,7 +259,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
       png(filename = output_path, width = 800, height = 800)
       # Plot the community structure
       
-      qgraph((G.DRIFT != "0") * 1, layout = "circle", labels = varnames, 
+      qgraph(t((G.DRIFT != "0") * 1), layout = "circle", labels = varnames, 
              edge.width = 5, diag = TRUE, edge.labels = "GROUP")
       dev.off()
       ks = ks[c(count:nrow(ks)),]
@@ -378,7 +378,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
           output_path = file.path(paste0(directory, "/Models/Subgroup ", subgroup, "/Subgroup ", subgroup, " Paths.png"))
           png(filename = output_path, width = 800, height = 800)
           # Plot the subgroup structure
-          qgraph(abs(((G.DRIFT != "0") * 1) - ((DRIFT != "0") * 1)), layout = "circle", labels = varnames, 
+          qgraph(t(abs(((G.DRIFT != "0") * 1) - ((DRIFT != "0") * 1))), layout = "circle", labels = varnames, 
                  edge.width = 5, diag = TRUE, edge.labels = paste0("SG-", subgroup))
           dev.off()
           message(paste0("Beginning Individual Model Fitting for Subgroup Members."))
@@ -501,7 +501,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
             }
             png(filename = paste0(directory, "/Models/Individuals/FinalModel_", i, ".PNG"), 
                 width = 800, height = 800)
-            qgraph(ests, layout = "circle", labels = varnames, 
+            qgraph(t(ests), layout = "circle", labels = varnames, 
                    edge.width = 1, diag = TRUE, edge.labels = round(c(ests), 2),
                    theme = "colorblind", fade = FALSE)
             dev.off()
