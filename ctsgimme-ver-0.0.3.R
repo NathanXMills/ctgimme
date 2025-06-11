@@ -502,7 +502,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
             png(filename = paste0(directory, "/Models/Individuals/FinalModel_", i, ".PNG"), 
                 width = 800, height = 800)
             qgraph(t(ests), layout = "circle", labels = varnames, 
-                   edge.width = 1, diag = TRUE, edge.labels = round(c(ests), 2),
+                   edge.width = 1, diag = TRUE, edge.labels = round(c(t(ests)), 2),
                    theme = "colorblind", fade = FALSE)
             dev.off()
             
