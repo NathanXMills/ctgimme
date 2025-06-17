@@ -1,17 +1,23 @@
+#nolint start
+# Why are do so many of these have defualt parameters of Null? It seems like this would break things later?
 ctsgimme = function(varnames = NULL, dataframe = NULL,
                     id = NULL, time = NULL,
                     cores = NULL, directory = NULL, 
                     sig.thrsh = 0.75,
                     ben.hoch = TRUE,
-                    Galpha = 0.05, 
+                    Galpha = 0.05,
                     Ialpha = 0.01,
                     ME.var = diag(1e-5, length(varnames)), 
                     PE.var = diag(1.00, length(varnames)),
                     time.intervals = c(1)){
+  # figures out which connection should be the next one made; which one would best improve the model
   JPmx = function (model, matrices = NA, full = TRUE){
     OpenMx:::warnModelCreatedByOldVersion(model)
+    # Checks to see if the matrices are NA (you did not provide one), and if so then it creates them from the model # nolint: line_length_linter.
     if (OpenMx:::single.na(matrices)) {
       matrices = names(model$matrices)
+      #if the model has things that it wants to be exempted from the matrices this will remove them  # nolint: line_length_linter.
+      #Unsure what MXExpectationRAM is or why model$exctation would be that, unless it's just something that you should know and is set by person making the model # nolint: line_length_linter.
       if (is(model$expectation, "MxExpectationRAM")) {
         matrices = setdiff(matrices, model$expectation$F)
       }
@@ -21,6 +27,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
     }
     param = omxGetParameters(model)
     param.names = names(param)
+      # makes a copy of the model but has every parameter fixed
     gmodel = omxSetParameters(model, free = FALSE, labels = param.names)
     mi.r = NULL
     mi.f = NULL
@@ -28,26 +35,37 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
     a.names = NULL
     new.models = list()
     for (amat in matrices) {
+      # does this break if you directly give matrices that are not inline with the model?
+      # what object type is model? What does it contain aside from matrices?
       matObj = model[[amat]]
+        # This is the same demensions as the matrix, but each cell is true/false
+        # Used later to keep track of which cells have been tried freed
       freemat = matObj$free
+        # unsure what this half empty matrix is for?
       sym.sel = upper.tri(freemat, diag = TRUE)
       notSymDiag = !(is(gmodel[[amat]])[1] %in% c("DiagMatrix", 
                                                   "SymmMatrix"))
       for (i in 1:length(freemat)) {
+          # checks to see if we have already tried freeing this cell
         if (freemat[i] == FALSE && (notSymDiag || sym.sel[i] == 
                                     TRUE)) {
           tmpLab = gmodel[[amat]]$labels[i]
           plusOneParamModel = model
+            # frees the cell that we are looking at if it's not empty or null
           if (length(tmpLab) > 0 && !is.na(tmpLab)) {
             gmodel = omxSetParameters(gmodel, labels = tmpLab, 
                                       free = TRUE)
             plusOneParamModel = omxSetParameters(plusOneParamModel, 
                                                  labels = tmpLab, free = TRUE)
           }
+            # frees the cell manually
+            # why does this distinction exist? Why can't you just use the else here?
           else {
             gmodel[[amat]]$free[i] = TRUE
             plusOneParamModel[[amat]]$free[i] = TRUE
           }
+          # I don't understand why Zero, Diagnal, and Symmetrical matricies don't work? Also why symmetrical -> symmetrical?
+            # turns zero matrices into full matricies, and diagnal and symmetrical ones into symmetrical matricies
           if (is(gmodel[[amat]])[1] %in% c("ZeroMatrix")) {
             cop = gmodel[[amat]]
             newSingleParamMat = mxMatrix("Full", nrow = nrow(cop), 
@@ -81,6 +99,8 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
           }
           gmodel[[amat]] = newSingleParamMat
           plusOneParamModel[[amat]] = newPlusOneParamMat
+            # I don't understand what these next couple lines are doing. 
+            # I think they're finding some things that are used for the modification index, but i don't know what those are
           custom.compute = mxComputeSequence(list(mxComputeNumericDeriv(checkGradient = FALSE), 
                                                   mxComputeReportDeriv()))
           gmodel = mxModel(gmodel, custom.compute)
@@ -92,9 +112,12 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
                                       free = FALSE)
             next
           }
+          # this calculates the modification index which tells us if changing this cell would improve the model 
           grad = grun$output$gradient
           hess = grun$output$hessian
           modind = 0.5 * grad^2/hess
+            # this calculates a more accurate modification index if you want it
+            # why not always use this one? why even have the above calculation?
           if (full == TRUE) {
             custom.compute.smart = mxComputeSequence(list(mxComputeNumericDeriv(knownHessian = model$output$hessian, 
                                                                                 checkGradient = FALSE), mxComputeReportDeriv()))
@@ -111,6 +134,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
           else {
             modind.full = NULL
           }
+          # if this cell should be changed it records it
           n.names = names(omxGetParameters(grun))
           if (length(modind) > 0) {
             a.names = c(a.names, n.names)
@@ -119,6 +143,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
             EPCs = c(EPCs, EPC)
             new.models = c(new.models, plusOneParamModel)
           }
+          # unfrees the current parameter before the next one is tested
           gmodel = omxSetParameters(gmodel, labels = names(omxGetParameters(gmodel)), 
                                     free = FALSE)
         }
@@ -130,6 +155,8 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
       }
       names(new.models) = a.names
     }
+    # repeats the process for any and all submodels
+      # I don't know what submodels these are. Are they subgroups, or individuals inside of group level analysis? 
     if (length(model$submodels) > 0) {
       for (asubmodel in names(model$submodels)) {
         ret = c(ret, JPmx(asubmodel))
@@ -147,9 +174,13 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
   dir.create(paste0(directory, "/MIs/"), showWarnings = FALSE)
   dir.create(paste0(directory, "/Models/"), showWarnings = FALSE)
   dir.create(paste0(directory, "/Models/Individuals/"), showWarnings = FALSE)  
+    # What does this dataframe look like? Trouble looking at Dataset.RDS 
   # Specifying Cores
   ids = unique(dataframe[,id])
   nvar = length(varnames)
+    # In theory shouldn't it be possible for there to be no group level commonalities? (maybe incase of null?)
+    # Why do you need to know the number of cores before, and why should they be based on the numher of ids?
+    # Shouldn't GIMME find these automatically, why are we getting this number from number of ids?
   if(length(ids) < cores){
     cores = length(ids)
     message("Cores adjusted to your sample-size!")
@@ -162,6 +193,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
   library(OpenMx)
   library(igraph)
   library(qgraph)
+    # I believe this is setting up parrelel computing for individual analysis
   cl = makeCluster(cores, type = "PSOCK")
   clusterExport(cl, c("dataframe", "JPmx",
                       "varnames", "id", "time", "directory",
@@ -174,10 +206,15 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
   ###---###---###---###---###---###---###
   # Running Step 1 in Parallel---###---##
   ###---###---###---###---###---###---###
+    # this looks at individuals before the group level analysis, and creates the models for what everperson looks like
+    # i is whatever id is currently being looked at, simular to looping through a list. Just it's all simultanious
   parLapply(cl, ids, function(i) {
+      # Creates a matrixs with the diagnol being "A_1,1", "A_2,2" etc
     DRIFT = diag(paste0("A_", 1:nvar, ",", 1:nvar), nvar)
+    # just looking at the part of the dataframe related to the current id
     subset_dat = subset(dataframe, id == i)
     # subset_dat[,varnames] = scale(subset_dat[,varnames])
+      # I don't realy understand what all of these do
     amat = mxMatrix("Full", nvar, nvar,
                     free   = DRIFT != "0",
                     name   = "A", ubound = 30, lbound = -30)
@@ -191,18 +228,21 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
     pmat = mxMatrix('Diag', nvar, nvar, FALSE, 1, name='P0')
     umat = mxMatrix('Zero', nvar, 1, name='u')
     tmat = mxMatrix('Full', 1, 1, FALSE, name='time', labels='data.Time')
+      # creates a ct OMX model based on the privious data
     osc = mxModel("OUMod", 
                   amat, bmat, cmat, dmat, qmat, 
                   rmat, xmat, pmat, umat, tmat,
                   mxExpectationSSCT('A', 'B', 'C', 'D', 'Q', 
                                     'R', 'x0', 'P0', 'u', 'time'),
                   mxFitFunctionML(),
-                  mxData(subset_dat, 'raw'))  
+                  mxData(subset_dat, 'raw'))
+      # fits the model using mxTryHard()
     analysis_result = tryCatch({
       fit = mxTryHard(osc)
     }, error = function(e) {
       message("Error for subject ", i, ": ", e$message)
     })
+      # figures out what is the next connection that should be made to improve the model and makes it
     if (!is.null(analysis_result)) {
       MIs = JPmx(analysis_result, matrices = "A")
       saveRDS(
@@ -211,6 +251,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
       )
     }
   })
+    # stops the parralel processing now that individual analysis is done
   stopCluster(cl)
   ###---###---###---###---###---###---###
   # Iteration Steps
@@ -226,7 +267,9 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
     ks = matrix(Galpha, nrow(ks), 1)
   }
   DRIFT = diag(paste0("A_", 1:nvar, 1:nvar), nvar)
+    # this is the core of the group level grouping and connections
   while(iterate < 1){
+      # reads all of the previously made modification indices and stores them in "files"
     rdss = list.files(paste0(directory, "/MIs/"), pattern = "\\.RDS$", full.names = TRUE)
     files = NULL
     for (file in rdss) {
@@ -238,22 +281,27 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
         NULL
       })) 
     }
+      # finds the best, most significant, possible change. Then sees if it is a significant change and checks if it is above the set threshold
     SigThresh = sum(pchisq(files[which.max(rowMeans(files)),], 1, lower.tail = FALSE) < ks[count,]) / 
       ncol(files) >= sig.thrsh
     
+      # adds the connection to the group level if it met the requirements
+      # deletes all modification indices
     if(SigThresh){
       param.to.add = which.max(rowMeans(files))
       cells = as.numeric(unlist(regmatches(rownames(files)[param.to.add], 
-                                           gregexpr("\\d+", rownames(files)[param.to.add]))))
+                                           gregexpr("\\d+", rownames(files)[param.to.add])))) # nolint
       DRIFT[cells[1], cells[2]] = paste0("A_", cells[1], ",", cells[2])
       message(paste0("Adding drift parameter A[", cells[1], ",", cells[2],"]"))
       message(paste0("Completed Step ", count))
+        # I don't understand, why do we do this 4 time?
       unlink(paste0(directory, "/MIs/", "*"), recursive = FALSE, force = TRUE)
       unlink(paste0(directory, "/MIs/", "*"), recursive = FALSE, force = TRUE)
       unlink(paste0(directory, "/MIs/", "*"), recursive = FALSE, force = TRUE)
       unlink(paste0(directory, "/MIs/", "*"), recursive = FALSE, force = TRUE)
       count = count + 1
     }else{
+        # Saves the current group level model and leaves the loop
       G.DRIFT = DRIFT
       output_path = file.path(directory, "Group Paths.png")
       png(filename = output_path, width = 800, height = 800)
@@ -266,6 +314,8 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
       message("Group Search Complete.")
       iterate = 1
     }
+      # Reruns and remakes individual models based on the new group level models
+      # simular to lines 211-252, possible to condense them?
     cl = makeCluster(cores, type = "PSOCK")
     clusterExport(cl, c("dataframe", "JPmx", "ME.var", "PE.var",
                         "varnames", "id", "time", "directory",
@@ -329,8 +379,12 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
   # Iteration Steps - Subgroup
   ###---###---###---###---###---###---###
   for(subgroup in sort(unique(memb))){
+    # matrix showing what parameters are freed
+      # I think this came from the group level analysis, but unsure why you would use it here?
+      # Maybe it is for telling which cells are common at group level, so not to touch those?
     DRIFT = G.DRIFT
     dir.create(paste0(directory, "/Models/Subgroup ", subgroup, "/"), showWarnings = FALSE)
+    # The following section has a ton of commonalities to lines 259+, and also another section later. Possible place to combine?
     iterate = 0; count = 1
     m = (nvar^2)-nvar
     sg.ks = matrix(NA, m, 1)
@@ -343,6 +397,8 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
     }
     memb.id = cbind(unique(dataframe$id), memb)
     while(iterate < 1){
+      # this first part is VERY simular to lines 271-296ish. Only real change is how MIs are gotten
+      # Finds the data for all individuals in the subgroup, then finds their modification indices
       new.data = subset(dataframe, id %in% subset(memb.id[,1], memb == subgroup))
       rdss = list.files(paste0(directory, "/MIs/"), pattern = "\\.RDS$", full.names = TRUE)
       rds_ids = as.numeric(gsub("MI_|\\.RDS", "", basename(rdss)))
@@ -350,6 +406,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
       matching_indices = which(rds_ids %in% valid_ids)
       matching_files = rdss[matching_indices][order(rds_ids[matching_indices])]
       files = NULL
+      # Combines all the files for the individuals in the subgroup
       for (file in matching_files) {
         file_id = gsub("MI_|\\.RDS", "", basename(file))
         files = cbind(files, tryCatch({
@@ -359,6 +416,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
           NULL
         }))
       }
+        # finds the best, most significant, possible change. Then sees if it is a significant change and checks if it is above the set threshold
       SigThresh = sum(pchisq(files[which.max(rowMeans(files)),], 1, lower.tail = FALSE) < sg.ks[count,]) / 
         ncol(files) >= sig.thrsh
       
@@ -371,6 +429,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
         message(paste0("Completed Step ", count))
         count = count + 1
       }else{
+        # Finished the subgroup, either move to individual level or do other subgroups
         if(max(memb) == 1){
           message("Beginning Individual-Level Search.")
         }else{
@@ -383,6 +442,7 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
           dev.off()
           message(paste0("Beginning Individual Model Fitting for Subgroup Members."))
         }
+          # The following section has a ton of commonalities to lines 259+, and also another section
         m = (nvar^2)-sum(DRIFT!="0")
         nks = matrix(NA, m, 1)
         for(k in 1:m){
@@ -578,3 +638,4 @@ ctsgimme = function(varnames = NULL, dataframe = NULL,
   }else{return(walktrap_comm)}
 }
 
+#nolint end
